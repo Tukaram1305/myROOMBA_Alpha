@@ -1,5 +1,5 @@
 Double H-bridge draft
-![Screenshot](markp_hmostek.JPG)
+![Screenshot](markp_hmostek.jpg)
 Main motors drivers drafts + front LED driver
 ![Screenshot](markp_motors.JPG)
 Device
