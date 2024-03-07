@@ -75,14 +75,16 @@ uint16_t BLOWER{0}, BRUSH{0}, SIDEBRUSH{0}, LIGHTS{0};
 // PINY NANO
 int Rblock = 5;
 int Lblock = 6;
-int LSonarPin{14}, RSonarPin{15};
+int LSonarPin{14}; /*A0*/ //RSonarPin{15};
 int RevInvertPin = 7;
+int adj_1pot = 15, /*A1*/ adj_2pot = 16; /*A2*/
 //DS18 PIN 8
 //RF24 PIN CE 2, PIN CSN 3
+//BAT V 17 (A3)
 
 // MAKS wartosci PWM / 4095
 const uint16_t SBRUSH_MAXPWM = 2048; // 50% MAKS
-const uint16_t BRUSH_MAXPWM  = 1020; // 25% MAKS
+const uint16_t BRUSH_MAXPWM  = 1080; // 26% / 25% MAKS 1020
 const uint16_t BLOWER_MAXPWM = 4020; // 98% MAKS
 const int FRONTLIGHTSCHAN = 3;
  bool revInvert = false, revInvert_p = false;
@@ -90,11 +92,14 @@ const int FRONTLIGHTSCHAN = 3;
  bool LisBlck = false, LisBlck_p = false;
 byte bitLRblck = 0;
 byte selectedMotor = 0; // 0-all, 1-sidebrush, 2-brush, 3-blower
+int adjPot_1_val, adjPot_2_val;
+int adjPot_1_val_p, adjPot_2_val_p;
 
 const uint16_t CAMSER_MIN = 210; // -- min(dolne), max(gorne) wychylenia serCam
 const uint16_t CAMSER_MAX = 400;
 uint16_t camSer=CAMSER_MIN;
 Kronos camSerDel;
+bool ENABLE_CamSer = false;
 
 #include "engine.h"
 Engine motors; // glowna instancja
@@ -151,6 +156,9 @@ Serial.begin(115200);
   pinMode(RevInvertPin, INPUT_PULLUP);
   pwm.setPWM(12, 0, camSer);
   rearLed.initLeds();
+
+  pinMode(adj_1pot,INPUT);
+  pinMode(adj_2pot,INPUT);
   Serial.println("SETUP END");
 } // SETUP END
 
@@ -281,7 +289,8 @@ void radioIncomming()
       //swiatla cofania
       if (LVert < 100) rearLed.writeR(255);
       if (LVert > 120) rearLed.writeR(0);
-      // Prowadzenie
+      
+      // Prowadzenie / kontrola robota
       if (isAIinControll==false && BATDANGERV==false) motors.drive(LVert, RHor);
       
       if (DEBUG==1)
@@ -328,9 +337,12 @@ void LR_anaBtns_check()
     }
     isRearIndicating = true;
   }
-  // Zmiana L BTN LONG --- xxx
+  // Zmiana L BTN LONG --- LOCK/UNLOCK SERCAM
   if (LbtnStateL_p != LbtnStateL && LHor > 25)
   {
+    
+    if (ENABLE_CamSer==false) {ENABLE_CamSer=true; rearLed.setIndiVals(4, 60, 60, 178, 32, 190); isRearIndicating = true; }
+    else {ENABLE_CamSer=false; rearLed.setIndiVals(4, 60, 60, 112, 32, 190); isRearIndicating = true; }
     LbtnStateL_p = LbtnStateL;
   }
   // Zmiana R BTN LONG --- wlacz PID
@@ -344,7 +356,7 @@ void LR_anaBtns_check()
     RbtnStateL_p = RbtnStateL;
   }
     // Zmiana L BTN LONG + R-ANA-HOR -> Aktywacja AI
-  if (LbtnStateL_p != LbtnStateL && LHor < 25)
+  if (LbtnStateL_p != LbtnStateL && LHor <= 25)
   {
     bitLRblck|=0x8;
     isAIinControll = true;
@@ -448,26 +460,43 @@ if ((potL_p-5 < potL || potL_p+5 > potL) && BATDANGERV==false)
 
 void R_vert_analog_check()
 {
-  if (RVert > 220 && camSerDel.del(30))
+  if (RVert > 220 && camSerDel.del(30) && ENABLE_CamSer==true)
   {
     pwm.setPWM(12, 0, camSer);
     if (camSer<400) camSer+=4;
-    Serial.println("Cam ser: "+String(camSer));
   }
-  if (RVert < 30 && camSerDel.del(30))
+  if (RVert < 30 && camSerDel.del(30) && ENABLE_CamSer==true)
   {
     pwm.setPWM(12, 0, camSer);
     if (camSer>210) camSer-=4;
-    Serial.println("Cam ser: "+String(camSer));
   }  
 }
 
 void L_hor_analog_check(){/*Chwilowo nic*/}
 
+void handle_adjPots()
+{
+  adjPot_1_val = analogRead(adj_1pot);
+  //adjPot_2_val = analogRead(adj_2pot);
+
+  if (adjPot_1_val > adjPot_1_val_p+15 || adjPot_1_val < adjPot_1_val_p-15 ) // histereza
+  { 
+    int pSP = map(adjPot_1_val, 0, 1024, -100, 100);
+    motors.setPID_SP(pSP);
+    Serial.println("CurrSP: "+String(motors.givePID_SP()));
+    adjPot_1_val_p = adjPot_1_val; 
+  }
+  
+  //if (adjPot_2_val > adjPot_2_val_p+15 || adjPot_2_val < adjPot_2_val_p-15) 
+  //{ 
+  //  Serial.println("Adj2: "+String(adjPot_2_val));
+  //  adjPot_2_val_p = adjPot_2_val; 
+  //}
+}
 void loop() {
 
   radioIncomming();
-
+  handle_adjPots();
   // A.I. Drive
   if (isAIinControll==true && BATDANGERV==false) { AI_drive(); }
 

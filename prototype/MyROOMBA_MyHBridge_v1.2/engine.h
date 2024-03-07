@@ -18,14 +18,17 @@ public:
 Engine (); 
 ~Engine();
 
+enum PIDMODE {mode_P=0, mode_PI=1, mode_PID=2};
 void motBegin (int LForw, int LBack, int RForw, int RBack, Adafruit_PWMServoDriver *adaPwmPtr, DFRobot_BMI160 *BMI);
 void drive(byte LV, byte RH );
 void stopMot();
 void chngGear();
 byte giveCGear();
 void turnOnPID();
-double calcPID(double tInterval, double setpoint, double procVar);
+double calcPID(double tInterval, double setpoint, double procVar, Engine::PIDMODE pidmode);
 void giveLastGYRO(int16_t gy[]);
+void setPID_SP(int newSP);
+double givePID_SP();
 private:
 Adafruit_PWMServoDriver *pwmptr = nullptr;
 DFRobot_BMI160 *bmi = nullptr;
@@ -50,11 +53,12 @@ const int AnaUPLim = 250; // gorny trshold
 const int AnaDWLim = 5;   // dolny trshold
 
 // PID vals
+PIDMODE _pidmode;
 int16_t GYRO[3]{0,0,0};
 bool PIDon = false;
 uint16_t PIDMOT = 0;
 double _max{4095}, _min{0};
-double _Kp{0.1}, _Kd{0.01}, _Ki{0.5};
+double _Kp{0.6}, _Kd{0.01}, _Ki{0.5};
 double _error_prev{0};
 double _integral{0};
 double SETPOINT = 0;

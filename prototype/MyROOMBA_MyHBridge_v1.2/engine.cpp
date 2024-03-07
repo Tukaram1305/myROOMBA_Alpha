@@ -54,9 +54,14 @@ void Engine::drive(byte LV, byte RH )
           if (PIDon==true && sterL==0 && sterR==0)
           {
             bmi->getGyroData(GYRO);
-            //if (GYRO[2] <= 10 && GYRO[2] >= -10) GYRO[2] = 0;
-            double DIF = calcPID(0.1, SETPOINT, double(GYRO[2]) );
+            //if (GYRO[2] <= 10 && GYRO[2] >= -20) GYRO[2] = 0;
+            double DIF = calcPID(0.1, SETPOINT, double(GYRO[2]), mode_PI );
             PIDMOT = static_cast<uint16_t>(round(DIF));
+            
+            //crude regulacja ale dziala
+            //if (GYRO[2] < 0) PIDMOT+=10;
+            //else if (GYRO[2] > 0) PIDMOT-=10;
+            
             //if (PIDMOT >4095) PIDMOT=4095;
             //if (PIDMOT <0) PIDMOT = 0;
             pwmptr->setPWM(LfPin, 0, spdL );
@@ -102,7 +107,7 @@ void Engine::drive(byte LV, byte RH )
         {
           bmi->getGyroData(this->GYRO);
           //if (GYRO[2] <= 10 && GYRO[2] >= -10) GYRO[2] = 0;
-          double DIF = calcPID(0.1, -SETPOINT, double(GYRO[2]) );
+          double DIF = calcPID(0.1, -SETPOINT, double(GYRO[2]), mode_PI );
           PIDMOT = static_cast<uint16_t>(round(DIF));
           //if (PIDMOT >4095) PIDMOT=4095;
           //if (PIDMOT <0) PIDMOT = 0;
@@ -161,14 +166,24 @@ void Engine::chngGear()
 byte Engine::giveCGear()
 { return this->cGEAR; }
 
-double Engine::calcPID(double tInterval, double setpoint, double procVar)
+double Engine::calcPID(double tInterval, double setpoint, double procVar, Engine::PIDMODE pidmode)
 {
+  Engine::PIDMODE cmPID = pidmode;
   double err = setpoint - procVar;
   double P_out = _Kp * err;
-  _integral += err * tInterval;
-  double I_out = _Ki * _integral;
-  double derivative = (err - _error_prev) / tInterval;
-  double D_out = _Kd * derivative;
+  double I_out{0};
+  double D_out{0};
+  if (cmPID==mode_PI || cmPID==mode_PID)
+  {
+    _integral += err * tInterval;
+    I_out = _Ki * _integral;
+  }
+  if (cmPID==mode_PID)
+  {
+    double derivative = (err - _error_prev) / tInterval;
+    D_out = _Kd * derivative;
+  }
+
   double PID_OUTPUT = P_out + I_out + D_out;
   if( PID_OUTPUT > _max ) PID_OUTPUT = _max;
   else if( PID_OUTPUT < _min ) PID_OUTPUT = _min;
@@ -184,3 +199,7 @@ void Engine::giveLastGYRO(int16_t gy[])
   gy[1] = this->GYRO[1];
   gy[2] = this->GYRO[2];
 }
+
+void Engine::setPID_SP(int newSP) { this->SETPOINT = static_cast<double>(newSP); }
+
+double Engine::givePID_SP() { return this->SETPOINT; }
