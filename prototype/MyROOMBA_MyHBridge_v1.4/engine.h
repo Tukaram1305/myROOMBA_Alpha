@@ -1,0 +1,68 @@
+/*Markowiak Pawel
+klasa dla zarzadzania motorami na mostku typu H*/
+#ifndef ENGINE_H
+#define ENGINE_H
+#include "Arduino.h"
+#include <Adafruit_PWMServoDriver.h>
+#include <DFRobot_BMI160.h>
+
+extern int16_t gyroData[3];
+extern bool revInvert, revInvert_p;
+extern bool RisBlck, RisBlck_p, LisBlck, LisBlck_p;
+
+class Engine {
+public:
+ //  Lewy mot.   Prawy mot.
+ // |FORW|BACK| |FORW|BACK| 
+ // |BACK|FORW| |BACK|FORW|
+Engine (); 
+~Engine();
+
+enum PIDMODE {mode_P=0, mode_PI=1, mode_PID=2};
+void motBegin (int LForw, int LBack, int RForw, int RBack, Adafruit_PWMServoDriver *adaPwmPtr, DFRobot_BMI160 *BMI);
+void drive(byte LV, byte RH );
+void stopMot();
+void chngGear();
+byte giveCGear();
+void turnOnPID();
+double calcPID(double tInterval, double setpoint, double procVar, Engine::PIDMODE pidmode);
+void giveLastGYRO(int16_t gy[]);
+void setPID_SP(int newSP);
+double givePID_SP();
+private:
+Adafruit_PWMServoDriver *pwmptr = nullptr;
+DFRobot_BMI160 *bmi = nullptr;
+int LfPin, LbPin, RfPin, RbPin;
+byte LV_p, RH_p;
+int sterL, sterR;
+int spdL, spdR;
+//        defaultowe biegi    1     2     3     4
+const uint16_t GEARS[4] = { 1024, 2048, 3072, 4095 };
+byte cGEAR = 3;
+byte LAST_DIR = 0;
+
+// limity - histereza galek analogowych
+const int lAnaMin = 120;
+              // MID 132
+const int lAnaMax = 144;
+//--^Lvert------vRhor---
+const int rAnaMin = 119;
+              // MID 129
+const int rAnaMax = 139;
+
+const int AnaUPLim = 250; // gorny trshold
+const int AnaDWLim = 5;   // dolny trshold
+
+// PID vals
+PIDMODE _pidmode;
+int16_t GYRO[3]{0,0,0};
+bool PIDon = false;
+uint16_t PIDMOT = 4095;
+double _max{4095}, _min{0};
+double _Kp{2.15}, _Kd{2.25}, _Ki{0.5};
+double _error_prev{0};
+double _integral{0};
+double SETPOINT = 0;
+};
+
+#endif
